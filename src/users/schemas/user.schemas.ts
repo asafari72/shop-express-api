@@ -1,27 +1,29 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
-export interface Roles{}
+export interface Roles { }
 
 export type UserDocument = User & Document;
 
 @Schema()
 export class User {
-  @Prop({ required: true })
-  name: string;
+  @Prop()
+  firstName: string;
+
+  @Prop()
+  lastName: string;
 
   @Prop({ required: true, unique: true })
-  username: string;
+  phoneNumber: string;
 
-  @Prop({ required: true })
-  password: string;
+  @Prop()
+  confirmCode: string;
+
+  @Prop({ default: 'USER' })
+  roles: Roles[];
 
   @Prop()
   refreshToken: string;
-  
-  @Prop()
-  roles: Roles[];
-
 
 }
 

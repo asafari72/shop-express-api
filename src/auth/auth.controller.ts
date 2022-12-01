@@ -1,23 +1,23 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { AccessTokenGuard } from '../common/guards/accessToken.guard';
 import { RefreshTokenGuard } from '../common/guards/refreshToken.guard';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { AuthService } from './auth.service';
-import { AuthDto } from './dto/auth.dto';
+import { AuthDto, AuthenticationDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
-  @Post('signup')
-  signup(@Body() createUserDto: CreateUserDto) {
-    return this.authService.signUp(createUserDto);
+  @Get('sendConfirmCode')
+  sendConfirmCode(@Query('phoneNumber') phoneNumber) {
+    return this.authService.sendConfimCode(phoneNumber);
   }
 
-  @Post('signin')
-  signin(@Body() data: AuthDto) {
-    return this.authService.signIn(data);
+  @Post('authentication')
+  authentication(@Body() createUserDto: CreateUserDto) {
+    return this.authService.authentication(createUserDto);
   }
 
   @UseGuards(AccessTokenGuard)

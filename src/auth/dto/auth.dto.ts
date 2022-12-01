@@ -1,4 +1,10 @@
 export class AuthDto {
-    username: string;
-    password: string;
-  }
+  phoneNumber: string;
+  confirmCode: string;
+}
+
+export class AuthenticationDto {
+  phoneNumber: string;
+  confirmCode: string;
+
+}

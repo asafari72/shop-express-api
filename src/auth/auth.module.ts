@@ -5,10 +5,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { AccessTokenStrategy } from './strategies/accessToken.strategy';
 import { RefreshTokenStrategy } from './strategies/refreshToken.strategy';
 import { UsersModule } from '../users/users.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
-  imports: [JwtModule.register({}), UsersModule],
+  imports: [JwtModule.register({}), UsersModule, HttpModule],
   controllers: [AuthController],
   providers: [AuthService, AccessTokenStrategy, RefreshTokenStrategy],
 })
-export class AuthModule {}
+export class AuthModule { }

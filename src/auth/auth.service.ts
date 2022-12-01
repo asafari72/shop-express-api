@@ -4,14 +4,16 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { AuthDto } from './dto/auth.dto';
+import { AuthDto, AuthenticationDto } from './dto/auth.dto';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { Roles } from '../users/schemas/user.schemas';
+import { HttpService } from '@nestjs/axios';
 
 @Injectable()
 export class AuthService {
@@ -19,39 +21,46 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private readonly httpService: HttpService
   ) { }
-  async signUp(createUserDto: CreateUserDto): Promise<any> {
-    // Check if user exists
-    const userExists = await this.usersService.findByUsername(
-      createUserDto.username,
-    );
-    if (userExists) {
-      throw new BadRequestException('User already exists');
-    }
 
-    // Hash password
-    const hash = await this.hashData(createUserDto.password);
-    const newUser = await this.usersService.create({
-      ...createUserDto,
-      password: hash,
-    });
-    const tokens = await this.getTokens(newUser._id, newUser.username, newUser.roles);
-    await this.updateRefreshToken(newUser._id, tokens.refreshToken);
-    return { message: 'Signup successful.', data: tokens };
+  async sendConfimCode(phoneNumber: string) {
+    const smsToken = this.configService.get<string>('SMS_TOKEN')
+    const bodyId = +this.configService.get<string>('SMS_BODY_ID')
+    const confirmCode = Math.floor(1000 + Math.random() * 9000).toString()
+    const body = { to: phoneNumber, bodyId, args: [confirmCode] }
+    try {
+      this.createUser({ phoneNumber, confirmCode })
+      await this.httpService.axiosRef.post(`https://console.melipayamak.com/api/send/shared/${smsToken}`, body);
+      return { message: 'Code sended' };
+    } catch (error) {
+      throw new InternalServerErrorException('Error while sending code');
+    }
   }
 
-  async signIn(data: AuthDto) {
-    // Check if user exists
-    debugger
-    const user = await this.usersService.findByUsername(data.username);
+  async authentication(data: AuthenticationDto) {
+    const user = await this.usersService.findByPhoneNumber(data.phoneNumber);
     if (!user) throw new BadRequestException('User does not exist');
-    const passwordMatches = await argon2.verify(user.password, data.password);
-    if (!passwordMatches)
-      throw new BadRequestException('Password is incorrect');
-    const tokens = await this.getTokens(user._id, user.username, user.roles);
+    const confirmCodeMatches = await argon2.verify(user.confirmCode, data.confirmCode);
+    if (!confirmCodeMatches)
+      throw new BadRequestException('confirmCode is incorrect');
+    const tokens = await this.getTokens(user._id, user.phoneNumber, user.roles);
     await this.updateRefreshToken(user._id, tokens.refreshToken);
     return { message: 'Signin successful.', data: tokens };
+
   }
+
+  async createUser(createUserDto: CreateUserDto) {
+    const user = await this.usersService.findByPhoneNumber(createUserDto.phoneNumber);
+    if (!user) {
+      await this.usersService.create(createUserDto)
+    }
+    else {
+      const confirmCode = await this.hashData(createUserDto.confirmCode)
+      await this.usersService.update(user._id, { confirmCode })
+    }
+  }
+
 
   async logout(userId: string) {
     try {
@@ -71,13 +80,9 @@ export class AuthService {
       refreshToken,
     );
     if (!refreshTokenMatches) throw new ForbiddenException('Access Denied');
-    const tokens = await this.getTokens(user.id, user.username, user.roles);
+    const tokens = await this.getTokens(user.id, user.phoneNumber, user.roles);
     await this.updateRefreshToken(user.id, tokens.refreshToken);
     return { message: 'Token generated.', data: tokens };
-  }
-
-  hashData(data: string) {
-    return argon2.hash(data);
   }
 
   async updateRefreshToken(userId: string, refreshToken: string) {
@@ -87,12 +92,12 @@ export class AuthService {
     });
   }
 
-  async getTokens(userId: string, username: string, roles: Roles[]) {
+  async getTokens(userId: string, phoneNumber: string, roles: Roles[]) {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         {
           sub: userId,
-          username,
+          phoneNumber,
           roles
         },
         {
@@ -103,7 +108,7 @@ export class AuthService {
       this.jwtService.signAsync(
         {
           sub: userId,
-          username,
+          phoneNumber,
           roles
         },
         {
@@ -117,5 +122,9 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  hashData(data: string) {
+    return argon2.hash(data);
   }
 }

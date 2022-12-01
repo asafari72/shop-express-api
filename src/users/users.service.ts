@@ -10,8 +10,8 @@ export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
-    const pass = createUserDto.password;
-    createUserDto.password = await argon2.hash(pass)
+    const confirmCode = createUserDto.confirmCode;
+    createUserDto.confirmCode = await argon2.hash(confirmCode)
     const createdUser = new this.userModel(createUserDto);
     return createdUser.save();
   }
@@ -24,8 +24,8 @@ export class UsersService {
     return this.userModel.findById(id);
   }
 
-  async findByUsername(username: string): Promise<UserDocument> {
-    return this.userModel.findOne({ username }).exec();
+  async findByPhoneNumber(phoneNumber: string): Promise<UserDocument> {
+    return this.userModel.findOne({ phoneNumber }).exec();
   }
 
   async update(

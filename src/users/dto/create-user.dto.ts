@@ -1,6 +1,7 @@
 export class CreateUserDto {
-  name: string;
-  username: string;
-  password: string;
+  phoneNumber: string;
+  confirmCode: string;
+  firstName?: string;
+  lastName?: string;
   refreshToken?: string;
 }
