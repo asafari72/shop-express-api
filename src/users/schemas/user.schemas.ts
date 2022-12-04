@@ -19,6 +19,9 @@ export class User {
   @Prop()
   confirmCode: string;
 
+  @Prop()
+  confirmCodeDispatchTime: string;
+
   @Prop({ default: 'USER' })
   roles: Roles[];
 

@@ -29,8 +29,9 @@ export class AuthService {
     const bodyId = +this.configService.get<string>('SMS_BODY_ID')
     const confirmCode = Math.floor(1000 + Math.random() * 9000).toString()
     const body = { to: phoneNumber, bodyId, args: [confirmCode] }
+    const dateNow = new Date(Date.now()).toString();
     try {
-      this.createUser({ phoneNumber, confirmCode })
+      this.createUser({ phoneNumber, confirmCode, confirmCodeDispatchTime: dateNow })
       await this.httpService.axiosRef.post(`https://console.melipayamak.com/api/send/shared/${smsToken}`, body);
       return { message: 'Code sended' };
     } catch (error) {
@@ -39,13 +40,21 @@ export class AuthService {
   }
 
   async authentication(data: AuthenticationDto) {
+    if (!data.confirmCode || !data.phoneNumber) throw new BadRequestException('User or confirm code is missing');
+
     const user = await this.usersService.findByPhoneNumber(data.phoneNumber);
     if (!user) throw new BadRequestException('User does not exist');
+
     const confirmCodeMatches = await argon2.verify(user.confirmCode, data.confirmCode);
-    if (!confirmCodeMatches)
-      throw new BadRequestException('confirmCode is incorrect');
+    if (!confirmCodeMatches) throw new BadRequestException('confirmCode is incorrect');
+
+    const isExpiredConfimCode = await this.isExpiredConfirmCode(user.confirmCodeDispatchTime);
+    if (isExpiredConfimCode) throw new BadRequestException('Confirm code is expired');
+    
+    
     const tokens = await this.getTokens(user._id, user.phoneNumber, user.roles);
     await this.updateRefreshToken(user._id, tokens.refreshToken);
+
     return { message: 'Signin successful.', data: tokens };
 
   }
@@ -57,10 +66,24 @@ export class AuthService {
     }
     else {
       const confirmCode = await this.hashData(createUserDto.confirmCode)
-      await this.usersService.update(user._id, { confirmCode })
+      await this.usersService.update(user._id, { confirmCode, confirmCodeDispatchTime: createUserDto.confirmCodeDispatchTime })
     }
   }
 
+  async isExpiredConfirmCode(confirmCodeDispatchTime:string){
+
+    const dispatchTime = new Date(confirmCodeDispatchTime) // 12:44
+    const baseTime = new Date(confirmCodeDispatchTime);
+    const addedTime = new Date(dispatchTime.setMinutes(dispatchTime.getMinutes() + 2)); // 12:46
+    
+    const isExpired = dispatchTime.getTime() <= addedTime.getTime();
+    return isExpired;
+    
+    // const confirmCodeDispatchTime = new Date(user.confirmCodeDispatchTime).getTime().toString();
+    // const confirmCodeExpireTime = new Date(confirmCodeDispatchTime.setMinutes(confirmCodeDispatchTime.getMinutes() + 2)).getTime().toString();
+    // const isExpiredConfimCode = confirmCodeExpireTime <= user.confirmCodeDispatchTime;
+    console.log(addedTime);
+  }
 
   async logout(userId: string) {
     try {
